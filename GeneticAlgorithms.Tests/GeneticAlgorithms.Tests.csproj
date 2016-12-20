@@ -37,6 +37,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Moq">
+      <HintPath>..\packages\Moq\lib\net45\Moq.dll</HintPath>
+    </Reference>
     <Reference Include="Shouldly">
       <HintPath>..\packages\Shouldly\lib\net451\Shouldly.dll</HintPath>
     </Reference>

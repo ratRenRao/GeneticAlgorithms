@@ -31,6 +31,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="IocContainer">
+      <HintPath>..\..\IocContainer\IocContainer\bin\Debug\IocContainer.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -42,7 +45,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="GeneticAlgorithm.cs" />
+    <Compile Include="Population.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="GeneticStrategies.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

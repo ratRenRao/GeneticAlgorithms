@@ -3,17 +3,20 @@ using System.Linq;
 using System.Reflection;
 using GeneticAlgorithms.Tests.TestingObjects;
 using Xunit;
+using Moq;
 using Shouldly;
 
 namespace GeneticAlgorithms.Tests
 {
     public class AlgorithmTests
     {
-        private readonly GeneticAlgorithm<TestCoordinates> _algorithm;
+        private readonly GeneticStrategies<TestCoordinates> _strategies;
+        private readonly Population<TestCoordinates> _population;
 
         public AlgorithmTests()
         {
-            _algorithm = new GeneticAlgorithm<TestCoordinates>(info => 0f, coordinates => 0f, (f, f1) => 0f, f => 0f);
+            _strategies = new GeneticStrategies<TestCoordinates>(info => 0f, coordinates => 0f, (f, f1) => 0f, f => 0f);
+            _population = new Population<TestCoordinates>(_strategies, 2);
         }
 
         [Fact]
@@ -21,8 +24,8 @@ namespace GeneticAlgorithms.Tests
         {
             Random rand = new Random();
             var vals = new[] {rand.Next(0, 10), rand.Next(10, 20)};
-            Func<PropertyInfo, float> generationStrategy = info => info.Name == "X" ? vals[0] : vals[1];
-            var child = _algorithm.GenerateRandomIndividualByProperty(generationStrategy);
+            _strategies.GenerationStrategy = info => info.Name == "X" ? vals[0] : vals[1];
+            var child = _population.Algorithm.GenerateRandomIndividualByProperty(_strategies.GenerationStrategy);
             child.X.ShouldBe(vals[0]);
             child.Y.ShouldBe(vals[1]);
         }
@@ -32,8 +35,8 @@ namespace GeneticAlgorithms.Tests
         {
             Random rand = new Random();
             var testCoordinates = new TestCoordinates(rand.Next(0, 10), rand.Next(10, 20));
-            Func<TestCoordinates, float> fitnessStrategy = coords => coords.X + 1f;
-            var fitness = _algorithm.CalculateFitness(testCoordinates, fitnessStrategy);
+            _strategies.FitnessStrategy = coords => coords.X + 1f;
+            var fitness = _population.Algorithm.CalculateFitness(testCoordinates, _strategies.FitnessStrategy);
             fitness.ShouldBe(testCoordinates.X + 1);
         }
 
@@ -43,8 +46,8 @@ namespace GeneticAlgorithms.Tests
             Random rand = new Random();
             var parent1 = new TestCoordinates(rand.Next(1, 1), rand.Next(2, 2));
             var parent2 = new TestCoordinates(rand.Next(3, 3), rand.Next(4, 4));
-            Func<float, float, float> fitnessStrategy = (f1, f2) => (f1+f2)/2;
-            var child = _algorithm.Reproduce(parent1, parent2, fitnessStrategy);
+            _strategies.ReproductionStrategy = (f1, f2) => (f1+f2)/2;
+            var child = _population.Algorithm.Reproduce(parent1, parent2, _strategies.ReproductionStrategy);
             child.X.ShouldBe(2);
             child.Y.ShouldBe(3);
         }
@@ -53,7 +56,7 @@ namespace GeneticAlgorithms.Tests
         public void initialize_population_returns_random_set_of_children()
         {
             Random rand = new Random();
-            Func<PropertyInfo, float> generationStrategy = x =>
+            _strategies.GenerationStrategy = x =>
             {
                 switch (x.Name)
                 {
@@ -65,7 +68,7 @@ namespace GeneticAlgorithms.Tests
                         return 0f;
                 }
             };
-            var population = _algorithm.InitializePopulation(10, generationStrategy).ToList();
+            var population = _population.Algorithm.InitializePopulation(10, _strategies.GenerationStrategy).ToList();
             foreach (var individual in population)
             {
                 individual.X.ShouldBeGreaterThanOrEqualTo(0);

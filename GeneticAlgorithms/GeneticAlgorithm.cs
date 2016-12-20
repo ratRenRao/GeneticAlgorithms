@@ -10,18 +10,17 @@ namespace GeneticAlgorithms
     public class GeneticAlgorithm<T>
     {
         private readonly Random _rand;
-        public Func<PropertyInfo, float> GenerationStrategy { get; set; }
-        public Func<T, float> FitnessStrategy { get; set; }
-        public Func<float, float, float> ReproductionStrategy { get; set; }
-        public Func<float, float> MutationStrategy { get; set; }
+        public GeneticStrategies<T> Strategies { get; set; }
 
-        public GeneticAlgorithm(Func<PropertyInfo, float> generationStrategy, Func<T, float> fitnessStrategy, Func<float, float, float> reproductionStrategy, Func<float, float> mutationStrategy)
+        public GeneticAlgorithm(GeneticStrategies<T> strategies)
         {
-            GenerationStrategy = generationStrategy;
-            FitnessStrategy = fitnessStrategy;
-            ReproductionStrategy = reproductionStrategy;
-            MutationStrategy = mutationStrategy;
+            Strategies = strategies;
             _rand = new Random();
+        }
+
+        public IEnumerable<T> InitializePopulation(int populationSize, GeneticStrategies<T> strategies)
+        {
+            return InitializePopulation(populationSize, strategies.GenerationStrategy);
         }
 
         public IEnumerable<T> InitializePopulation(int populationSize, Func<PropertyInfo, float> generationStrategy)
@@ -63,7 +62,7 @@ namespace GeneticAlgorithms
 
         public float CalculateFitness(T individual)
         {
-            return CalculateFitness(individual, FitnessStrategy);
+            return CalculateFitness(individual, Strategies.FitnessStrategy);
         }
 
         public float CalculateFitness(T individual, Func<T, float> fitnessStrategy)
@@ -71,6 +70,9 @@ namespace GeneticAlgorithms
             return fitnessStrategy.Invoke(individual);
         }
 
+        //
+        // Change funcs to be type specific. Maybe use an ioc container to store/resolve the strategy based on the property type
+        //
         public IEnumerable<T> NextGeneration(T[] initialSet, int populationSize, Func<float, float, float> reproductionStrategy)
         {
             T[] population = new T[populationSize];
@@ -97,7 +99,7 @@ namespace GeneticAlgorithms
 
         public T MutateIndividual(T individual)
         {
-            return MutateIndividual(individual, MutationStrategy);
+            return MutateIndividual(individual, Strategies.MutationStrategy);
         }
 
         public T MutateIndividual(T individual, Func<float, float> mutationStrategy)
