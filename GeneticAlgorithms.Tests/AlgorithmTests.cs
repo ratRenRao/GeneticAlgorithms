@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using GeneticAlgorithms.Tests.TestingObjects;
@@ -15,7 +16,7 @@ namespace GeneticAlgorithms.Tests
 
         public AlgorithmTests()
         {
-            _strategies = new GeneticStrategies<TestCoordinates>(info => 0f, coordinates => 0f, (f, f1) => 0f, f => 0f);
+            _strategies = new GeneticStrategies<TestCoordinates>(info => 0f, coordinates => 0f, f => 0f);
             _population = new Population<TestCoordinates>(_strategies, 2);
         }
 
@@ -46,8 +47,8 @@ namespace GeneticAlgorithms.Tests
             Random rand = new Random();
             var parent1 = new TestCoordinates(rand.Next(1, 1), rand.Next(2, 2));
             var parent2 = new TestCoordinates(rand.Next(3, 3), rand.Next(4, 4));
-            _strategies.ReproductionStrategy = (f1, f2) => (f1+f2)/2;
-            var child = _population.Algorithm.Reproduce(parent1, parent2, _strategies.ReproductionStrategy);
+            _strategies.ReproductionStrategies.Add(typeof (float), (f1, f2) => (f1+f2)/2);
+            var child = _population.Algorithm.Reproduce(parent1, parent2, _strategies.ReproductionStrategies);
             child.X.ShouldBe(2);
             child.Y.ShouldBe(3);
         }
@@ -68,7 +69,7 @@ namespace GeneticAlgorithms.Tests
                         return 0f;
                 }
             };
-            var population = _population.Algorithm.InitializePopulation(10, _strategies.GenerationStrategy).ToList();
+            var population = _population.Algorithm.CreateNewPopulation(10, _strategies.GenerationStrategy).ToList();
             foreach (var individual in population)
             {
                 individual.X.ShouldBeGreaterThanOrEqualTo(0);
@@ -78,6 +79,69 @@ namespace GeneticAlgorithms.Tests
             }
             population.Max(x => x.X).ShouldBeGreaterThan(population.Min(x => x.X));
             population.Max(x => x.Y).ShouldBeGreaterThan(population.Min(x => x.Y));
+        }
+
+        [Fact]
+        public void population_add_children_stores_new_individuals()
+        {
+            Random rand = new Random();
+            _strategies.GenerationStrategy = x =>
+            {
+                switch (x.Name)
+                {
+                    case "X":
+                        return rand.Next(0, 10);
+                    case "Y":
+                        return rand.Next(10, 20);
+                    default:
+                        return 0f;
+                }
+            };
+            _population.ReinitializePopulation(10, _strategies.GenerationStrategy);
+            _population.AddChildren(_population.Algorithm.CreateNewPopulation(4, _strategies.GenerationStrategy).ToArray());
+            _population.Members.Count().ShouldBe(14);
+        }
+
+        [Fact]
+        public void kill_individual_removes_object_from_population()
+        {
+            _population.ReinitializePopulation(10, _strategies.GenerationStrategy);
+            var id = _population.Members.First().Id;
+            _population.KillMember(id);
+            _population.Members.SingleOrDefault(x => x.Id == id).ShouldBeNull();
+        }
+
+        [Fact]
+        public void generate_by_constructor_creates_valid_individual()
+        {
+            _strategies.GenerationStrategy = x => 1;
+
+            var individual = _population.Algorithm
+                .GenerateRandomIndividualByConstructor(_strategies.GenerationStrategy, typeof(TestCoordinates).GetConstructors().SingleOrDefault(x => x.GetParameters().Length == 2));
+            individual.X.ShouldBe(1);
+            individual.Y.ShouldBe(1);
+        }
+
+        [Fact]
+        public void kill_unfit_members_removes_lowest_fitness_members()
+        {
+            Random rand = new Random();
+            _strategies.GenerationStrategy = x =>
+            {
+                switch (x.Name)
+                {
+                    case "X":
+                        return rand.Next(0, 10);
+                    case "Y":
+                        return rand.Next(10, 20);
+                    default:
+                        return 0f;
+                }
+            };
+            _population.ReinitializePopulation(10, _strategies.GenerationStrategy);
+            var unfitIds = _population.Members.Where(x => x.Fitness != 0).OrderByDescending(x => -x.Fitness).Take(2).Select(x => x.Id).ToArray();
+            _population.KillOffLowFitnessMembers(.20);
+            _population.Members.SingleOrDefault(x => unfitIds.Contains(x.Id)).ShouldBeNull();
         }
 
         //Does it make sense to implement this???

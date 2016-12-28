@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace GeneticAlgorithms
 {
-    public class GeneticAlgorithm<T>
+    public class GeneticAlgorithm<T> where T : Member
     {
         private readonly Random _rand;
         public GeneticStrategies<T> Strategies { get; set; }
@@ -18,12 +18,12 @@ namespace GeneticAlgorithms
             _rand = new Random();
         }
 
-        public IEnumerable<T> InitializePopulation(int populationSize, GeneticStrategies<T> strategies)
+        public IEnumerable<T> CreateNewPopulation(int populationSize, GeneticStrategies<T> strategies)
         {
-            return InitializePopulation(populationSize, strategies.GenerationStrategy);
+            return CreateNewPopulation(populationSize, strategies.GenerationStrategy);
         }
 
-        public IEnumerable<T> InitializePopulation(int populationSize, Func<PropertyInfo, float> generationStrategy)
+        public IEnumerable<T> CreateNewPopulation(int populationSize, Func<PropertyInfo, float> generationStrategy)
         {
             T[] population = new T[populationSize];
 
@@ -39,7 +39,7 @@ namespace GeneticAlgorithms
         {
             var props = typeof (T).GetProperties();
             var newIndividual = (T)Activator.CreateInstance(typeof(T));
-            foreach (var attribute in props) //typeof(T).GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Public))
+            foreach (var attribute in props)
             {
                 typeof(T).GetProperty(attribute.Name).SetValue(newIndividual, generationStrategy.Invoke(attribute));
             }
@@ -48,11 +48,13 @@ namespace GeneticAlgorithms
         }
 
         // Feature not yet implemented
-        public T GenerateRandomIndividualByConstructor(Func<ParameterInfo, float> generationStrategy)
+        public T GenerateRandomIndividualByConstructor(Func<PropertyInfo, float> generationStrategy, ConstructorInfo constructorInfo = null)
         {
-            var constructor = typeof(T).GetConstructors().OrderByDescending(x => x.GetParameters().Length).First();
+            if(constructorInfo == null)
+                constructorInfo = typeof(T).GetConstructors().OrderByDescending(x => x.GetParameters().Length).Last();
+            //constructor = typeof(T).GetConstructors().Single(x => x.GetCustomAttributesData().Count == constructorInfo.GetCu)
             List<object> newParameters = new List<object>();
-            foreach (var attribute in constructor.GetParameters())
+            foreach (var attribute in typeof(T).GetProperties().Where(x => constructorInfo.GetParameters().Select(y => y.ParameterType).Contains(x.PropertyType)))
             {
                 newParameters.Add(generationStrategy.Invoke(attribute));
             }
@@ -70,28 +72,40 @@ namespace GeneticAlgorithms
             return fitnessStrategy.Invoke(individual);
         }
 
-        //
-        // Change funcs to be type specific. Maybe use an ioc container to store/resolve the strategy based on the property type
-        //
-        public IEnumerable<T> NextGeneration(T[] initialSet, int populationSize, Func<float, float, float> reproductionStrategy)
+        public IEnumerable<T> NextGeneration(Population<T> oldPopulation, int populationSize, GeneticStrategies<T> strategies)
         {
             T[] population = new T[populationSize];
 
+            foreach (var individual in oldPopulation.Members)
+            {
+                individual.Fitness = CalculateFitness(individual, strategies.FitnessStrategy);
+            }
+
             for (int i = 0; i < populationSize; i++)
             {
-                population[i] = Reproduce(initialSet[_rand.Next(initialSet.Length)], initialSet[_rand.Next(initialSet.Length)], reproductionStrategy);
+                var firstParent = (T) GetRandomIndividualWeightedByFitness(oldPopulation);
+                var secontParent = (T) GetRandomIndividualWeightedByFitness(oldPopulation, firstParent);
+                population[i] = Reproduce(firstParent, secontParent, strategies.ReproductionStrategies);
             }
 
             return population;
         }
 
-        public T Reproduce(T firstParent, T secondParent, Func<float, float, float> reproductionStrategy)
+        public T Reproduce(T firstParent, T secondParent, Dictionary<Type, Func<float, float, float>> reproductionStrategies)
         {
             var objectProperties = typeof (T).GetProperties();
             List<object> newProperties = new List<object>();
             foreach (var attribute in objectProperties)
             {
-                newProperties.Add(reproductionStrategy.Invoke((float)attribute.GetValue(firstParent), (float)attribute.GetValue(secondParent)));
+                var strategy = reproductionStrategies.SingleOrDefault(prop => prop.Key == attribute.PropertyType);
+                if (strategy.Key != null)
+                {
+                    newProperties.Add(strategy.Value.Invoke((float) attribute.GetValue(firstParent), (float) attribute.GetValue(secondParent)));
+                }
+                else
+                {
+                    newProperties.Add(new Random().Next(1) == 0 ? firstParent : secondParent);
+                }
             }
 
             return (T)Activator.CreateInstance(typeof(T), newProperties.ToArray());
@@ -111,6 +125,15 @@ namespace GeneticAlgorithms
             }
 
             return individual;
+        }
+
+        public IEnumerable<T> GetRandomIndividualWeightedByFitness(Population<T> population, T otherParent = null)
+        {
+            var individualArray = population.Members.ToList().Where(x => x.Id != otherParent?.Id).Select(x => _rand.Next(1, (int)x.Fitness)).ToArray();
+            for(int i = 0; i < population.Members.Count() - 1; i++)
+            {
+                yield return individualArray[i] > individualArray[1 + 1] ? population.Members.ToList()[i] : population.Members.ToList()[i + 1];
+            }
         }
     }
 }

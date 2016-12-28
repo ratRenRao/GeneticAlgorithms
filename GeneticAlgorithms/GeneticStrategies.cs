@@ -12,14 +12,13 @@ namespace GeneticAlgorithms
     {
         public Func<PropertyInfo, float> GenerationStrategy { get; set; }
         public Func<T, float> FitnessStrategy { get; set; }
-        public Func<float, float, float> ReproductionStrategy { get; set; }
+        public Dictionary<Type, Func<float, float, float>> ReproductionStrategies = new Dictionary<Type, Func<float, float, float>>();
         public Func<float, float> MutationStrategy { get; set; }
 
-        public GeneticStrategies(Func<PropertyInfo, float> generationStrategy, Func<T, float> fitnessStrategy, Func<float, float, float> reproductionStrategy, Func<float, float> mutationStrategy)
+        public GeneticStrategies(Func<PropertyInfo, float> generationStrategy, Func<T, float> fitnessStrategy, Func<float, float> mutationStrategy)
         {
             GenerationStrategy = generationStrategy;
             FitnessStrategy = fitnessStrategy;
-            ReproductionStrategy = reproductionStrategy;
             MutationStrategy = mutationStrategy;
         }
     }
