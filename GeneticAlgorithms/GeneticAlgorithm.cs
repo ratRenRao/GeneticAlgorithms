@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace GeneticAlgorithms
 {
@@ -18,16 +16,16 @@ namespace GeneticAlgorithms
             _rand = new Random();
         }
 
-        public IEnumerable<T> CreateNewPopulation(int populationSize, GeneticStrategies<T> strategies)
+        public IEnumerable<T> CreateNewPopulation(int populationSize)
         {
-            return CreateNewPopulation(populationSize, strategies.GenerationStrategy);
+            return CreateNewPopulation(populationSize, Strategies.GenerationStrategy);
         }
 
         public IEnumerable<T> CreateNewPopulation(int populationSize, Func<PropertyInfo, float> generationStrategy)
         {
-            T[] population = new T[populationSize];
+            var population = new T[populationSize];
 
-            for (int i = 0; i < populationSize; i++)
+            for (var i = 0; i < populationSize; i++)
             {
                 population[i] = GenerateRandomIndividualByProperty(generationStrategy);
             }
@@ -35,31 +33,47 @@ namespace GeneticAlgorithms
             return population;
         }
 
+        public T GenerateRandomIndividualByProperty()
+        {
+            return GenerateRandomIndividualByProperty(Strategies.GenerationStrategy);
+        }
+
         public T GenerateRandomIndividualByProperty(Func<PropertyInfo, float> generationStrategy)
         {
             var props = typeof (T).GetProperties();
-            var newIndividual = (T)Activator.CreateInstance(typeof(T));
+            var newMember = (T)Activator.CreateInstance(typeof(T));
             foreach (var attribute in props)
             {
-                typeof(T).GetProperty(attribute.Name).SetValue(newIndividual, generationStrategy.Invoke(attribute));
+                var propertyType = attribute.PropertyType;
+                var targetType = IsNullableType(propertyType) ? Nullable.GetUnderlyingType(propertyType) : propertyType;
+                var propertyValue = Convert.ChangeType(generationStrategy.Invoke(attribute), targetType);
+                attribute.SetValue(newMember, propertyValue, null);
             }
 
-            return newIndividual;
+            return newMember;
         }
 
-        // Feature not yet implemented
+        private static bool IsNullableType(Type type)
+        {
+            return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+        }
+
+        public T GenerateRandomIndividualByConstructor(ConstructorInfo constructorInfo = null)
+        {
+            return GenerateRandomIndividualByConstructor(Strategies.GenerationStrategy, constructorInfo);
+        }
+
         public T GenerateRandomIndividualByConstructor(Func<PropertyInfo, float> generationStrategy, ConstructorInfo constructorInfo = null)
         {
             if(constructorInfo == null)
                 constructorInfo = typeof(T).GetConstructors().OrderByDescending(x => x.GetParameters().Length).Last();
-            //constructor = typeof(T).GetConstructors().Single(x => x.GetCustomAttributesData().Count == constructorInfo.GetCu)
-            List<object> newParameters = new List<object>();
-            foreach (var attribute in typeof(T).GetProperties().Where(x => constructorInfo.GetParameters().Select(y => y.ParameterType).Contains(x.PropertyType)))
-            {
-                newParameters.Add(generationStrategy.Invoke(attribute));
-            }
 
-            return (T)Activator.CreateInstance(typeof(T), newParameters.ToArray());
+            return (T)Activator.CreateInstance(typeof(T), typeof (T).GetProperties()
+                .Where(x => constructorInfo.GetParameters()
+                    .Select(y => y.ParameterType)
+                    .Contains(x.PropertyType))
+                .Select(generationStrategy.Invoke)
+                .Cast<object>().ToArray());
         }
 
         public float CalculateFitness(T individual)
@@ -72,16 +86,21 @@ namespace GeneticAlgorithms
             return fitnessStrategy.Invoke(individual);
         }
 
+        public IEnumerable<T> NextGeneration(Population<T> oldPopulation, int populationSize)
+        {
+            return NextGeneration(oldPopulation, populationSize, Strategies);
+        }
+
         public IEnumerable<T> NextGeneration(Population<T> oldPopulation, int populationSize, GeneticStrategies<T> strategies)
         {
-            T[] population = new T[populationSize];
+            var population = new T[populationSize];
 
             foreach (var individual in oldPopulation.Members)
             {
                 individual.Fitness = CalculateFitness(individual, strategies.FitnessStrategy);
             }
 
-            for (int i = 0; i < populationSize; i++)
+            for (var i = 0; i < populationSize; i++)
             {
                 var firstParent = (T) GetRandomIndividualWeightedByFitness(oldPopulation);
                 var secontParent = (T) GetRandomIndividualWeightedByFitness(oldPopulation, firstParent);
@@ -91,10 +110,15 @@ namespace GeneticAlgorithms
             return population;
         }
 
+        public T Reproduce(T firstParent, T secondParent)
+        {
+            return Reproduce(firstParent, secondParent, Strategies.ReproductionStrategies);
+        }
+
         public T Reproduce(T firstParent, T secondParent, Dictionary<Type, Func<float, float, float>> reproductionStrategies)
         {
             var objectProperties = typeof (T).GetProperties();
-            List<object> newProperties = new List<object>();
+            var newProperties = new List<object>();
             foreach (var attribute in objectProperties)
             {
                 var strategy = reproductionStrategies.SingleOrDefault(prop => prop.Key == attribute.PropertyType);
@@ -108,7 +132,9 @@ namespace GeneticAlgorithms
                 }
             }
 
-            return (T)Activator.CreateInstance(typeof(T), newProperties.ToArray());
+            var child = (T)Activator.CreateInstance(typeof(T), newProperties.ToArray());
+            child.Initialize();
+            return child;
         }
 
         public T MutateIndividual(T individual)
@@ -119,7 +145,7 @@ namespace GeneticAlgorithms
         public T MutateIndividual(T individual, Func<float, float> mutationStrategy)
         {
             var props = typeof(T).GetProperties();
-            foreach (var attribute in props) //typeof(T).GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Public))
+            foreach (var attribute in props)
             {
                 typeof(T).GetProperty(attribute.Name).SetValue(individual, mutationStrategy.Invoke((float)attribute.GetValue(individual)));
             }
@@ -130,7 +156,7 @@ namespace GeneticAlgorithms
         public IEnumerable<T> GetRandomIndividualWeightedByFitness(Population<T> population, T otherParent = null)
         {
             var individualArray = population.Members.ToList().Where(x => x.Id != otherParent?.Id).Select(x => _rand.Next(1, (int)x.Fitness)).ToArray();
-            for(int i = 0; i < population.Members.Count() - 1; i++)
+            for(var i = 0; i < population.Members.Count() - 1; i++)
             {
                 yield return individualArray[i] > individualArray[1 + 1] ? population.Members.ToList()[i] : population.Members.ToList()[i + 1];
             }

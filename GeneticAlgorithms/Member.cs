@@ -11,5 +11,11 @@ namespace GeneticAlgorithms
         private static int _idCount;
         public int Id = _idCount++;
         public float Fitness;
+
+        public virtual void Initialize()
+        {
+            
+        }
+
     }
 }
