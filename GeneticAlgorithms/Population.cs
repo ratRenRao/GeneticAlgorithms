@@ -20,7 +20,7 @@ namespace GeneticAlgorithms
             Members = Algorithm.CreateNewPopulation(populationSize, Strategies.GenerationStrategy);
         }
 
-        public void ReinitializePopulation(int size, Func<PropertyInfo, float> generationStrategy)
+        public void ReinitializePopulation(int size, Func<PropertyInfo, object> generationStrategy)
         {
             Members = Algorithm.CreateNewPopulation(size, generationStrategy);
         }

@@ -47,7 +47,14 @@ namespace GeneticAlgorithms.Tests
             Random rand = new Random();
             var parent1 = new TestCoordinates(rand.Next(1, 1), rand.Next(2, 2));
             var parent2 = new TestCoordinates(rand.Next(3, 3), rand.Next(4, 4));
-            _strategies.ReproductionStrategies.Add(typeof (float), (f1, f2) => (f1+f2)/2);
+            _strategies.ReproductionStrategies.Add(new Strategy<dynamic>
+            {
+                Method = (f1, f2) => (f1+f2)/2
+            });
+            _strategies.ReproductionStrategies.Add(new Strategy<dynamic>
+            {
+                Method = (f1, f2) => (f1 + f2)/2
+            });
             var child = _population.Algorithm.Reproduce(parent1, parent2, _strategies.ReproductionStrategies);
             child.X.ShouldBe(2);
             child.Y.ShouldBe(3);
