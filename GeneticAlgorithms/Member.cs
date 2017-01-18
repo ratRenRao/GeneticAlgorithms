@@ -6,16 +6,20 @@ using System.Threading.Tasks;
 
 namespace GeneticAlgorithms
 {
-    public class Member
+    public abstract class Member : IMember
     {
-        private static int _idCount;
-        public int Id = _idCount++;
-        public float Fitness;
-
-        public virtual void Initialize()
+        private static int _id;
+        protected Member(int generation)
         {
-            
+            Id = _id++;
+            Generation = generation;
         }
 
+        public int Id { get; }
+        public double Fitness { get; set; }
+        public int Generation { get; }
+
+        public virtual void Initialize() { }
+       
     }
 }

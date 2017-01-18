@@ -1,22 +1,35 @@
-﻿namespace GeneticAlgorithms.Tests.TestingObjects
+﻿using System.Security.Principal;
+
+namespace GeneticAlgorithms.Tests.TestingObjects
 {
     public class TestCoordinates : Member
     {
-        private static int _idCount = 0;
-        public float X { get; set; }
-        public float Y { get; set; }
+        public double X { get; set; }
+        public double  Y { get; set; }
+        public NestedAttribute Z { get; set; }
 
-
-        public TestCoordinates()
+        public TestCoordinates(int generation) : base(generation)
         {
-            Id = _idCount++;
         }
 
-        public TestCoordinates(float x, float y)
+        public TestCoordinates(double x, double y, int generation) : base(generation)
         {
             X = x;
             Y = y;
-            Id = _idCount++;
+        }
+
+        public void Initialize()
+        {
+        }
+    }
+
+    public class NestedAttribute
+    {
+        public int NestedVal { get; set; }
+
+        public NestedAttribute(int n)
+        {
+            NestedVal = n;
         }
     }
 }
